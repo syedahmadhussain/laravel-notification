@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  api:
+    container_name: php
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - mysql
+    volumes:
+      - '.:/app'
+    ports:
+      - '8000:8000'
+    networks:
+      - notification-network
+
+  mysql:
+    image: 'mysql:8.0.33'
+    container_name: mysql
+    environment:
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+    volumes:
+      - 'mysql:/var/lib/mysql'
+    ports:
+      - '3306:3306'
+    networks:
+      - notification-network
+
+  mailpit:
+    image: 'axllent/mailpit:latest'
+    ports:
+      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - notification-network
+
+networks:
+  notification-network:
+    driver: bridge
+
+volumes:
+  mysql:
+    driver: local

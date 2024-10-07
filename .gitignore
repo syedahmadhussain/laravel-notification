@@ -1,0 +1,9 @@
+.env
+vendor
+
+.idea/*
+
+./storage
+
+/storage/logs/laravel.log
+
