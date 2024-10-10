@@ -1,45 +1,84 @@
 version: '3.8'
-
 services:
-  api:
-    container_name: php
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      - mysql
-    volumes:
-      - '.:/app'
-    ports:
-      - '8000:8000'
-    networks:
-      - notification-network
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: php
+        restart: unless-stopped
+        working_dir: /var/www
+        ports:
+            - "9000:9000"
+        volumes:
+            - .:/var/www
+            - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
+        networks:
+            - notification
+    db:
+        image: 'mysql:8.0.33'
+        platform: linux/x86_64
+        container_name: mysql
+        restart: unless-stopped
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE}
+            MYSQL_USER: ${DB_USERNAME}
+            MYSQL_PASSWORD: ${DB_PASSWORD}
+            MYSQL_ROOT_PASSWORD: secret
+        ports:
+            - "3306:3306"
+        volumes:
+            - dbdata:/var/lib/mysql
+        networks:
+            - notification
 
-  mysql:
-    image: 'mysql:8.0.33'
-    container_name: mysql
-    environment:
-      MYSQL_DATABASE: '${DB_DATABASE}'
-      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
-    volumes:
-      - 'mysql:/var/lib/mysql'
-    ports:
-      - '3306:3306'
-    networks:
-      - notification-network
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+            - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+        networks:
+            - notification
 
-  mailpit:
-    image: 'axllent/mailpit:latest'
-    ports:
-      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
-      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
-    networks:
-      - notification-network
+    redis:
+        image: redis:alpine
+        container_name: redis_cache
+        restart: unless-stopped
+        ports:
+            - "6379:6379"
+        networks:
+            - notification
+
+    laravel-echo-server:
+        image: node:14
+        container_name: echo_server
+        working_dir: /var/www
+        command: sh -c "npm install && npx laravel-echo-server start --force"
+        ports:
+            - "6001:6001"
+        volumes:
+            - .:/var/www
+        depends_on:
+            - redis
+        networks:
+            - notification
+
+    queue:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        command: php artisan queue:work --sleep=3 --tries=3
+        volumes:
+            - .:/var/www
+        depends_on:
+            - app
+            - db
+            - redis
+        networks:
+            - notification
 
 networks:
-  notification-network:
-    driver: bridge
+    notification:
+        driver: bridge
 
 volumes:
-  mysql:
-    driver: local
+    dbdata:

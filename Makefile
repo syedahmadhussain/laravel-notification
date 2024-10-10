@@ -2,12 +2,11 @@
 
 DOCKER_CONTAINER = php
 DOCKER_DB_CONTAINER = mysql
-DB_NAME = gomoon
+DB_NAME = notification
 
 build_docker_image:
 	docker build -t $(DOCKER_IMAGE) .
 
-# Path: makefile
 run_docker_container:
 	docker run -it --rm --name $(DOCKER_CONTAINER)
 	docker run -it --rm --name $(DOCKER_DB_CONTAINER)
@@ -33,21 +32,17 @@ composer-install:
 key-gen:
 	@docker exec -it $(DOCKER_CONTAINER) php artisan key:generate --force
 
-passport-install:
-	@docker exec -it $(DOCKER_CONTAINER) php artisan passport:install --force
-
+seed:
+	@docker exec -it $(DOCKER_CONTAINER) php artisan db:seed
 
 migrate:
 	@docker exec -it $(DOCKER_CONTAINER) php artisan migrate
 
-serve:
-	@docker exec $(DOCKER_CONTAINER) php artisan serve --host=0.0.0.0 --port=8000 > /dev/null 2>&1 &
-
 only-install: make-env build-docker composer-install migrate
 
-run: run_docker serve
+run: run_docker
 
-install: make-env build-docker run_docker composer-install key-gen migrate serve
+install: make-env build-docker run_docker composer-install key-gen migrate seed
 
 stop: stop_docker
 
